@@ -46,7 +46,7 @@ class _Parser(object):
         """
         ret = self._parsed
 
-        self._parsed = {}
+        self._parsed = ParsedDict()
         self._string = self._string[self._idx:]
         self._idx = 0
         self._mark = self._idx
@@ -104,11 +104,12 @@ class _Parser(object):
             raise ParseError('Unmatched parentheses at index %d' % 
                              (self._mark-1,))
 
-    def line_generator(self, socket):
+    def line_generator(self, socket, catch_parse_errors=True):
         """
         Takes a socket (or anything that implements the `recv` method) and
         returns a generator which will parse and return data comming over
-        the socket by line, as the lines come in.
+        the socket by line, as the lines come in. If `catch_parse_errors` is
+        set, will yeild parse errors instead of throwing them.
         """
         data = socket.recv(1024).decode('utf-8')
 
@@ -117,8 +118,16 @@ class _Parser(object):
 
             try:
                 self._partial_parse()
-            except EOLException:
+            except EOLException, e:
                 yield self._flip()
+            except ParseError, e:
+                if catch_parse_errors:
+                    self._idx = len(self._string)
+                    self._flip() # Clear parser state
+                    print 'S:', repr(self._string)
+                    yield e
+                else:
+                    raise e
 
             data = socket.recv(1024).decode('utf-8')
 
@@ -173,9 +182,9 @@ def loads(string):
     parser.parse()
     return parser._parsed
 
-def recv_load(socket):
+def recv_load(socket, catch_parse_errors=True):
     p = _Parser("")
-    return p.line_generator(socket)
+    return p.line_generator(socket, catch_parse_errors=True)
 
 def is_valid(string):
     try:
