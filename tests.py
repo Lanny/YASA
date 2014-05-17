@@ -21,6 +21,10 @@ class TestParse(unittest.TestCase):
         d = parse.loads('(ACTION SEHSAH-TSIL) (HASHES (1 2 3 4\\))')
         assert 'HASHES' in d
         assert d['HASHES'] == '(1 2 3 4)'
+        
+        d = parse.loads('(ACTION SEHSAH-TSIL) SHALOM (HASHES (1 2 3 4\\))')
+        assert len(d.keys()) == 2
+        assert 'SHALOM' not in d
 
     def test_unescape(self):
         assert parse.unescape(r'(HASHES (1 2 3 4\))') == '(HASHES (1 2 3 4))'

@@ -3,6 +3,9 @@ import re
 class ParseError(Exception):
     pass
 
+class EOLException(Exception):
+    pass
+
 # Parser states
 IN_KEY = 0
 IN_VALUE = 1
@@ -13,22 +16,45 @@ class _Parser(object):
         self._parsed = {}
         self._idx = 0
         self._mark = self._idx
-        self._slen = len(string)
         self._string = string
         self._mode = OUTSIDE
         self._key = None
         self._value = None
 
-    def parse(self):
+    def _flip(self):
         """
-        Parses the remainder of the string.
+        Clears the buffer (_string), returns the parsed object, and resets
+        the parser to accept the next line.
         """
-        while self._idx < self._slen:
+        ret = self._parsed
+
+        self._parsed = {}
+        self._string = self._string[self._idx:]
+        self._idx = 0
+        self._mark = self._idx
+        self._key = None
+        self._value = None
+        self._mode = OUTSIDE
+
+        return ret
+
+    def _partial_parse(self):
+        """
+        Parses the remainder of the string, may leave parsing partially
+        complete.
+        """
+        slen = len(self._string)
+        while self._idx < slen:
             c = self._string[self._idx]
 
-            if self._mode == OUTSIDE and c == '(':
-                self._mode = IN_KEY
-                self._mark = self._idx+1
+            if self._mode == OUTSIDE:
+                if c == '(':
+                    self._mode = IN_KEY
+                    self._mark = self._idx+1
+
+                elif c == '\n':
+                    self._idx += 1
+                    raise EOLException('End of line reached.')
 
             elif self._mode == IN_KEY:
                 cp = ord(c)
@@ -49,9 +75,36 @@ class _Parser(object):
 
             self._idx += 1
 
+    def parse(self):
+        """
+        Parses the remainder of the string, assumes the string represents a
+        complete map.
+        """
+        self._partial_parse()
+
         if self._mode != OUTSIDE:
             raise ParseError('Unmatched parentheses at index %d' % 
                              (self._mark-1,))
+
+    def line_generator(self, socket):
+        """
+        Takes a socket (or anything that implements the `recv` method) and
+        returns a generator which will parse and return data comming over
+        the socket by line, as the lines come in.
+        """
+        data = socket.recv(1024)
+
+        while data:
+            self._string += data
+
+            try:
+                self._partial_parse()
+            except EOLException:
+                yield self._flip()
+
+            data = socket.recv(1024)
+
+
 def unescape(string):
     """
     Takes a string and unescapes it per the spec
@@ -68,6 +121,10 @@ def loads(string):
     parser = _Parser(string)
     parser.parse()
     return parser._parsed
+
+def recv_load(socket):
+    p = _Parser("")
+    return p.line_generator(socket)
 
 def is_valid(string):
     try:
