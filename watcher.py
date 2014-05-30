@@ -81,15 +81,5 @@ def reconcile(path, conn):
     cursor.close()
 
 if __name__ == '__main__':
-    must_init = not os.path.exists('node.db')
-
-    conn = sqlite3.connect('node.db')
-    conn.row_factory = utils.dict_factory
-    cursor = conn.cursor()
-
-    if must_init:
-        schema = open('schema.sql', 'r')
-        cursor.executescript(schema.read())
-        schema.close()
-
+    conn = utils.get_client_connection('yasaclient.db')
     reconcile('testlib_one', conn)

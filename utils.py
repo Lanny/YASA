@@ -24,6 +24,23 @@ def arrow(exp, *args):
 
     return exp
 
+def get_client_connection(path):
+    """
+    Returns a sqlite3 db connection to the provided path. Creates and inits 
+    the db if none exists.
+    """
+    must_init = not os.path.exists(path)
+
+    conn = sqlite3.connect(path)
+    conn.row_factory = utils.dict_factory
+
+    if must_init:
+        schema = open('clientschema.sql', 'r')
+        cursor.executescript(schema.read())
+        schema.close()
+
+
+
 def hash_file(fd, hash_fn=hashlib.md5):
     """
     Takes a file descriptor, returns a hash object of that file's contents.
