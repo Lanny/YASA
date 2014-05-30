@@ -44,7 +44,7 @@ def insert_file_record(record, conn):
     """
     cursor = conn.cursor()
 
-    field_names = ['path', 'hash', 'mtime', 
+    field_names = ['path', 'hash', 'mtime', 'server_id',
                    'last_internal_update', 'last_scan']
     sql = 'INSERT INTO files (%s) VALUES (%s)' % (
         ', '.join(field_names), ', '.join(['?' for x in field_names]))
@@ -65,6 +65,7 @@ def generate_file_info(path):
 
     return {'path': path,
             'hash': h.hexdigest(),
+            'server_id': None,
             'mtime': int(os.path.getmtime(path)),
             'last_internal_update': t,
             'last_scan': t }

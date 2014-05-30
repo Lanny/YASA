@@ -4,7 +4,7 @@ Yet Another Synchronization Application, YASA, is a distributed file synchroniza
 
 ## Terminology
 
-A **Node** represents a subset of a complete complete library. Presently YASA does not support any sharding strategy, so every node is a complete copy (still a subset, btw) of the total library. Sharding will likely appear in future revisions of the protocol. Typically a node will represent a single machiene, but multiple nodes on the same computer, or a single node shared locally via a network drive are both possible as well.
+A **Node** represents a subset of a complete complete library. Presently YASA does not support any sharding strategy, so every node is a complete copy (still a subset, btw) of the total library. Sharding will likely appear in future revisions of the protocol. Typically a node will represent a single machine, but multiple nodes on the same computer, or a single node shared locally via a network drive are both possible as well.
 
 A **Node Reference** uniquely identifies a node. One consists of
 
@@ -17,6 +17,24 @@ UUIDs should persist for the lifetime of a node while addresses may change over 
 A **Network** consists of an undirected graph of connected nodes which together represent a complete library. In a stable state a network should be _complete_, that is every node should have a node reference pointing to every other node in the network.
 
 Every node is either considered **address stable** or **address volatile**. These properties can be thought of as describing the machine as having a static or dynamic IP address. They allow for more efficient location of nodes which are down or have changed address. Every node decides its own stability status and all other nodes must respect it. A simple implementation may opt to consider every node as address volatile at some (generally minor) performance cost.
+
+A **policy** is simply a rule or setting, its value decides how a node operating under that policy will behave in the situations governed by that policy. **Network Policy** is policy that it is safe to assume is shared by every node in the network, and which new nodes should adopt upon joining the network (see the `NET-POLICY` action). **Node Policy** is the opposite, that is policy is only held by a single node and which may be different on each node in the network.
+
+## Strategy
+
+YASA formally specifies a protocol below for exchanging data between node pairs. In order to put or pull data to/from a network it must follow that protocol. This section deals with how to use that protocol in order to keep a library synchronized across machines. You can think of the protocol section as dealing with _how_ to transfer while this section concerns _what_ data should be transfer data and _when_ to do it.
+
+### Storage Directory
+
+A node must maintain a consistent directory structure on its filesystem. For ID3 tagged files it should be `artist/album/trackno - title`. Other file types, or mp3 files missing required metadata, may reside in a special `OTHER` directory (a child of the base storage directory). Files may be symbolic links, or whatever the closest thing is on the system in question. For example, the standard implementation aims to support modern Linux distress, Windows 7 and above, and OSX which means symbolic links will be used. An extension could use NTFS junctions to make XP nodes possible. The important thing is that we have a standard directory structure for scanning.
+
+### File Watching
+
+A YASA implementation should walk its storage directory and compare it against its stored record of the directory. Differences should be stored and offered when other clients request updates. The exact mechanics of file watching are up to the implementation. This implementation opts to poll the watched directory periodically. If target platforms support filesystem callbacks on changes to the files, even better. An implementation may even opt to forgo watching and instead allow the client to trigger a rescan of "watched" directories at their discretion.
+
+### Updates
+
+Both file modifications and 
 
 ## Protocol
 
@@ -55,7 +73,7 @@ Lists are a special case of maps which describe sequential data (everyone loves 
 #### Node References
 A node reference is a three key map that describes a node in a YASA network. The three keys are `UUID`, `ADDR`, and `VOL`. Each key's value is described below.
 
-- **UUID** a string containing a human readable and a machine part, separated by the "@" character. The human readable part should be user configurable and will most likely describe the physical location of a node. The machine part should be a RFC4122 UUID. They are considered together to describe a node, changing either part changes the whole UUID, so `C1@1234` is a different UUID from `C2@1234`.
+- **UUID** a string containing a human readable and a machine part, separated by the "@" character. The human readable part should be user configurable and will most likely describe the physical location of a node. The machine part should be a version 4 RFC4122 UUID. They are considered together to describe a node, changing either part changes the whole UUID, so `C1@1234` is a different UUID from `C2@1234`.
 - **ADDR** a string of the form `<host>:<port>` that identifies the address of a YASA node.
 - **VOL** a string, either `VOLATILE` or `STABLE` indicating the volatility status of the node.
 
@@ -81,10 +99,14 @@ data followed by the unencoded 16 byte MD5 digest of the data sent.
 
 You may notice a theme.
 
-- **HELO** Should be the first message sent in a session, HELO identifies the client in a session. Takes an additional mandatory key `I-AM` that contains a node reference identifying the sender.
-- **OLEH** The only valid response to HELO. Identifiers the session server. Takes an additional mandatory key `I-AM` and non-mandatory `BUSY`. `I-AM` identifies the sender(the server) with a node reference. `BUSY`, if present, signals the server can not accept the session temporarily and that the client should retry shortly. `BUSY` may optionally contain a `REASON` key containing a human readable message and a `TIMEOUT` key specifying a suggested number of seconds to wait before attempting to initiate a new session.
-- **LIST-HASHES** [client only] A request for the server to send the hash of every file its tracking. No additional keys
-- **SEHSAH-TSIL** [server only] Response to LIST-HASHES. One additional key, `HASHES`, is a list of hexadecimal encoded md5 identity hashes of every file being tracked.
+- **HELO** [client] Should be the first message sent in a session, HELO identifies the client in a session. Takes an additional mandatory key `I-AM` that contains a node reference identifying the sender.
+- **OLEH** [server] The only valid response to HELO. Identifiers the session server. Takes an additional mandatory key `I-AM` and non-mandatory `BUSY`. `I-AM` identifies the sender(the server) with a node reference. `BUSY`, if present, signals the server can not accept the session temporarily and that the client should retry shortly. `BUSY` may optionally contain a `REASON` key containing a human readable message and a `TIMEOUT` key specifying a suggested number of seconds to wait before attempting to initiate a new session.
+- **LIST-HASHES** [client] A request for the server to send the hash of every file its tracking. No additional keys
+- **SEHSAH-TSIL** [server] Response to LIST-HASHES. One additional key, `HASHES`, is a list of hexadecimal encoded md5 identity hashes of every file being tracked.
+- **SHARE-NODES** [client] A request for all nodes considered by the server to be part of the network (what exactly that means is a network policy). No additional keys are defined.
+- **SEDON-ERAHS** [server] Response to SHARE-NODES. One key is defined, `REFS`, which is a list of node references which the server recognizes as part of the network. Should not include the client's node reference.
+- **NET-POLICY** [client] A request for all network the network policies.
+- **YCILOP-TEN** [server] Response to NET-POLICY. Single mandatory additional key `POLICY` is a map of policy names to values.
 
 ## Session Examples
 
@@ -98,6 +120,16 @@ C: (ACTION HELO) (I-AM (UUID WORK@020AE080-DCB7-11E3-9C1A-0800200C9A66)
 S: (ACTION OLEH) (I-AM (UUID HOME@8757BE80-DCB6-11E3-9C1A-0800200C9A66) 
                        (ADDR c-76-126-2-179.hsd1.ca.comcast.net:7454) 
                        (VOL VOLATILE))
+C: (ACTION SHARE-NODES)
+S: (ACTION SEDON-ERAHS) 
+   (REFS (LENGTH 1)
+         (1 (UUID BAR@610EE08F-DCB7-11E4-9C1A-0800200C9A66)
+            (ADDR sub.barcrawlers.net:7454)
+            (VOL STABLE)))
+```
+
+### Integrity Validation                
+```
 C: (ACTION LIST-HASHES)
 S: (ACTION SEHSAH-TSIL) (HASHES (LENGTH 2152)
                                 (0 4ddd17b0c9241d7b24a4960caefe8e40)

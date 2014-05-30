@@ -124,7 +124,6 @@ class _Parser(object):
                 if catch_parse_errors:
                     self._idx = len(self._string)
                     self._flip() # Clear parser state
-                    print 'S:', repr(self._string)
                     yield e
                 else:
                     raise e
@@ -185,6 +184,20 @@ def loads(string):
 def recv_load(socket, catch_parse_errors=True):
     p = _Parser("")
     return p.line_generator(socket, catch_parse_errors=True)
+
+def listify(l):
+    """
+    Takes a YASA syle list (already parsed into a dictionary) and returns a
+    python list.
+    """
+    arr = [None] * int(l.get('length', 0))
+    for k, v in l.items():
+        if k.upper() == 'LENGTH':
+            continue
+
+        arr[int(k)] = v
+
+    return arr
 
 def is_valid(string):
     try:

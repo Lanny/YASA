@@ -1,5 +1,6 @@
 CREATE TABLE files (
   id INTEGER PRIMARY KEY,
+  server_id INTEGER,
   path TEXT,
   hash TEXT,
   mtime INTEGER,
@@ -13,18 +14,6 @@ CREATE TABLE deleted (
   id INTEGER PRIMARY KEY,
   del_time INTEGER,
   path TEXT );
-
-CREATE TABLE node_refs (
-  id INTEGER PRIMARY KEY,
-  uuid TEXT,
-  address TEXT,
-  stability INTEGER,
-  last_asked INTEGER,
-  last_told INTEGER,
-  UNIQUE(uuid),
-  UNIQUE(address) ON CONFLICT REPLACE);
-
-
 
 CREATE TABLE settings (
   key TEXT,

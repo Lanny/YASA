@@ -3,16 +3,22 @@ import os
 import hashlib
 import time
 import sqlite3
+import logging
 
-def scan(path, cursor):
+import utils
+
+logging.basicConfig(level=logging.INFO)
+
+def scan(path, conn):
     """
-    Walks a directory and compares it to the databse pointed at by `cursor`,
+    Walks a directory and compares it to the databse pointed at by `conn`,
     returning a three tuple of files added to or removed from the directory 
     verses its representation in the db respectively. Modified files will be
     included in both added and removed lists. Will update the `last_scan` 
     fields within the db. Note that no effort is made to identify files which 
     have moved.
     """
+    cursor = conn.cursor()
     scan_start = time.time()
     added = []
     removed = []
@@ -30,25 +36,55 @@ def scan(path, cursor):
             else:
                 fs_mtime = os.path.getmtime(file_path)
 
-                if fs_mtime > record.mtime:
+                if fs_mtime > record['mtime']:
                     # This file is marked as having been modified since we
                     # last saw it, time to hash to check for changes.
-                    pass
+                    fd = open(file_path, 'rb')
+                    hash_value = utils.hash_file(fd).hexdigest()
 
-                cursor.execute('UPDATE files SET (last_scan) ? WHERE id = ?',
-                               [scan_start, record.id])
+                    if hash_value != record['hash']:
+                        added.append(file_path)
+                        removed.append(record['id'])
 
-    cursor.commit()
+                cursor.execute('UPDATE files SET last_scan=? WHERE id=?',
+                               [scan_start, record['id']])
 
-    cursor.execute('SELECT id FROM files WHERE last_scan < ?', [scan_start])
-    removed = [x.id for x in cursor.fetchall()]
+    conn.commit()
+
+    cursor.execute('SELECT * FROM files WHERE last_scan < ?', [scan_start])
+    removed.extend(cursor.fetchall())
+    cursor.close()
 
     return added, removed
+
+def reconcile(path, conn):
+    """
+    Given a path and a connection to a DB, alter the DB to reflect the present
+    structure of the directory.
+    """
+    cursor = conn.cursor()
+    added, removed = scan(path, conn)
+
+    for path in added:
+        logging.info("Adding file: %s" % path)
+        utils.arrow(path,
+                    (utils.generate_file_info),
+                    (utils.insert_file_record, conn))
+
+    for record in removed:
+        logging.info("Recording as gone: %s" % path)
+        cursor.execute('INSERT INTO deleted (del_time, path) VALUES (?, ?)',
+                       [time.time(), record['path']])
+        cursor.execute('DELETE FROM files WHERE id=?', [record['id']])
+
+    conn.commit()
+    cursor.close()
 
 if __name__ == '__main__':
     must_init = not os.path.exists('node.db')
 
     conn = sqlite3.connect('node.db')
+    conn.row_factory = utils.dict_factory
     cursor = conn.cursor()
 
     if must_init:
@@ -56,9 +92,4 @@ if __name__ == '__main__':
         cursor.executescript(schema.read())
         schema.close()
 
-    added, removed = scan('testlib_one', cursor)
-    for p in added: print p
-    print ''
-    for r in removed: print r
-
-
+    reconcile('testlib_one', conn)
