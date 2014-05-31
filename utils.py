@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 import os
 import time
+import sqlite3
 import hashlib
 import socket
 import urllib
@@ -32,14 +33,33 @@ def get_client_connection(path):
     must_init = not os.path.exists(path)
 
     conn = sqlite3.connect(path)
-    conn.row_factory = utils.dict_factory
+    conn.row_factory = dict_factory
 
     if must_init:
+        cursor = conn.cursor()
         schema = open('clientschema.sql', 'r')
         cursor.executescript(schema.read())
         schema.close()
 
+    return conn
 
+def get_server_connection(path):
+    """
+    Returns a sqlite3 db connection to the provided path. Creates and inits 
+    the db if none exists.
+    """
+    must_init = not os.path.exists(path)
+
+    conn = sqlite3.connect(path)
+    conn.row_factory = dict_factory
+
+    if must_init:
+        cursor = conn.cursor()
+        schema = open('serverschema.sql', 'r')
+        cursor.executescript(schema.read())
+        schema.close()
+
+    return conn
 
 def hash_file(fd, hash_fn=hashlib.md5):
     """

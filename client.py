@@ -111,8 +111,9 @@ class YASAClientSession(object):
         since = (utils.read_settings(self._conn, 'last_update')
                       .get('last_update', 0))
         cursor = self._conn.cursor()
-        to_recv = parse.listify(self.communicate({'ACTION': 'PULL',
-                                                  'SINCE': since}))
+        response = self.communicate({'ACTION': 'PULL',
+                                     'SINCE': since})
+        to_recv = parse.listify(parse.loads(response['CHANGES']))
 
         logging.info('Adding %d new files from server.' % len(to_recv))
 
@@ -173,9 +174,10 @@ class YASAClientSession(object):
         rem_files = cursor.fetchall()
 
         for record in add_files:
-            request = parse.dumps({'ACTION': 'PUSH',
-                                   'TYPE': 'NEW'})
-            self._send(request)
+            response = self.communicate({'ACTION': 'PUSH',
+                                         'TYPE': 'NEW'})
+            cursor.execute('UPDATE files SET server_id=? WHERE id=?',
+                           [int(response['ID']), record['id']])
 
             fd = open(record['path'], 'rb')
             fsize = os.fstat(f.fileno()).st_size

@@ -88,7 +88,7 @@ class _Parser(object):
             elif self._mode == IN_VALUE and c == ')' and \
                     self._string[self._idx-1] != '\\':
                 self._value = unescape(self._string[self._mark:self._idx])
-                self._parsed[self._key] = self._value
+                self._parsed[self._key.upper()] = self._value
                 self._mode = OUTSIDE
 
             self._idx += 1

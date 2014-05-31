@@ -1,8 +1,10 @@
 #!/usr/bin/env python
 import socket
 import os
+import sqlite3
 
 import parse
+import utils
 
 class YASAServerSession(object):
     def __init__(self, s):
@@ -10,10 +12,20 @@ class YASAServerSession(object):
         self._session = {}
         self._extensions = []
         self._middleware = []
+        self._conn = utils.get_server_connection('server.db')
         self._action_handlers = {
             'HELO': self.helo_command,
+            'PULL': self.pull_command,
             'DEFAULT': self.default_command
         }
+
+    def _send(self, msg):
+        totalsent = 0
+        while totalsent < len(msg):
+            sent = self._socket.send(msg[totalsent:])
+            if sent == 0:
+                raise RuntimeError("socket connection broken")
+            totalsent += sent
 
     def run(self):
         commands = parse.recv_load(self._socket)
@@ -25,7 +37,7 @@ class YASAServerSession(object):
             if callable(resp):
                 pass
             else:
-                self._socket.send(resp + '\n')
+                self._send(resp + '\n')
 
     def _handle_command(self, command):
         if isinstance(command, parse.ParseError):
@@ -59,6 +71,26 @@ class YASAServerSession(object):
     def helo_command(self, command, session):
         response = {'ACTION': 'OLEH'}
         return response, session
+
+    def pull_command(self, command, session):
+        cursor = self._conn.cursor()
+        cursor.execute('SELECT * FROM files WHERE received>?', 
+                       [int(command['SINCE'])])
+        new_files = cursor.fetchall()
+        cursor.execute('SELECT * FROM deleted WHERE del_time>?', 
+                       [int(command['SINCE'])])
+        del_files = cursor.fetchall()
+
+        l = []
+        for record in new_files:
+            l.append({'ID': record['id'],
+                      'TYPE': 'NEW'})
+        for record in del_files:
+            l.append({'ID': record['file_id'],
+                      'TYPE': 'DELETE'})
+
+        resp = {'ACTION': 'LLUP', 'CHANGES': l}
+        return resp, session
 
     def default_command(self, command, session):
         response = {'ACTION': 'ERROR',
