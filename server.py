@@ -16,6 +16,7 @@ class YASAServerSession(object):
         self._action_handlers = {
             'HELO': self.helo_command,
             'PULL': self.pull_command,
+            'PULL-FILE': self.pull_file_command,
             'DEFAULT': self.default_command
         }
 
@@ -33,8 +34,9 @@ class YASAServerSession(object):
         for command in commands:
             resp = self._handle_command(command)
 
-            # Hook for generators
-            if callable(resp):
+            if not resp:
+                pass
+            elif callable(resp): # Hook for generators
                 pass
             else:
                 self._send(resp + '\n')
@@ -52,7 +54,9 @@ class YASAServerSession(object):
             resp = {'ACTION': 'ERROR',
                     'REASON': 'Missing key: `%s`' % e.missing_key}
 
-        if callable(resp):
+        if not resp:
+            return None
+        elif callable(resp):
             return resp
         else:
             return parse.dumps(resp)
@@ -91,6 +95,20 @@ class YASAServerSession(object):
 
         resp = {'ACTION': 'LLUP', 'CHANGES': l}
         return resp, session
+
+    def pull_file_command(self, command, session):
+        """
+        Serves the file with a specified server ID to the client.
+        """
+        cursor = self._conn.cursor()
+        sid = int(command['ID'])
+        cursor.execute('SELECT path, hash FROM files WHERE id=?', [sid])
+        record = cursor.fetchone()
+
+        utils.push_file(record['path'], self._socket,
+                        hash_code=record['hash'].decode('hex'))
+
+        return None, session
 
     def default_command(self, command, session):
         response = {'ACTION': 'ERROR',

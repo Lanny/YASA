@@ -179,21 +179,13 @@ class YASAClientSession(object):
             cursor.execute('UPDATE files SET server_id=? WHERE id=?',
                            [int(response['ID']), record['id']])
 
-            fd = open(record['path'], 'rb')
-            fsize = os.fstat(f.fileno()).st_size
-            self._send('%d\n' % fsize)
-
-            totes = 0
-            while totes < fsize:
-                send_size = min(1024, fsize-totes)
-                self._send(fd.read(send_size))
-                totes += send_size
+            utils.push_file(record['path'], self._socket, 
+                            hash_code=record['hash'].decode('hex'))
 
         for record in rem_files:
-            request = parse.dumps({'ACTION': 'PUSH',
-                                   'TYPE': 'DELETE',
-                                   'SID': record['server_id']})
-            self._send(request)
+            response = self.communicate({'ACTION': 'PUSH',
+                                         'TYPE': 'DELETE',
+                                         'SID': record['server_id']})
 
     def sync(self):
         self.do_pull()

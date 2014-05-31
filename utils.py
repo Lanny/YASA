@@ -61,6 +61,36 @@ def get_server_connection(path):
 
     return conn
 
+def _send(socket, msg):
+    totes_sent = 0
+    while totes_sent < len(msg):
+        sent = socket.send(buf[totes_sent:])
+        if sent == 0:
+            raise RuntimeError("socket connection broken")
+        totes_sent += sent
+
+def push_file(path, socket, hash_code=None, buf_size=1024):
+    """
+    Given a path to a file and optionally a hash, sends both over the socket
+    per the YASA convention. Will generate hash if none is provided.
+    """
+    if not hash_code:
+        fd = open(path, 'rb')
+        hash_code = hash_file(fd).digest()
+        fd.close()
+
+    fd = open(path, 'rb')
+    fsize = os.fstat(f.fileno()).st_size
+    _send(socket, '%d\n' % fsize)
+
+    totes = 0
+    while totes < fsize:
+        send_size = min(buf_size, fsize-totes)
+        _send(socket, fd.read(send_size))
+        totes += send_size
+
+    _send(socket, hash_code)
+
 def hash_file(fd, hash_fn=hashlib.md5):
     """
     Takes a file descriptor, returns a hash object of that file's contents.
