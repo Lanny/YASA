@@ -82,30 +82,9 @@ class YASAClientSession(object):
                                'ID': file_id})
         self._send(request)
         file_name = os.tmpnam()
-        fd = open(file_name, 'wb')
 
-        buf = ''
-        while '\n' not in buf:
-            buf += self._socket.recv(1024).decode('utf-8')
-
-        flen, buf = buf.split('\n', 1)
-        flen = int(flen.strip())
-        totes = len(buf)
-        fd.write(buf)
-
-        while totes < flen:
-            buf = socket.recv(min(1024, flen-totes))
-            totes += len(buf)
-            fd.write(buf)
-
-        totes = 0
-        buf = ''
-        while len(buf) < 16:
-            buf += socket.recv(16-len(buf))
-
-        fd.close()
-
-        return fime_name, buf
+        digest = utils.pull_file(fime_name, self._socket)
+        return file_name, digest
 
     def do_pull(self):
         since = (utils.read_settings(self._conn, 'last_update')

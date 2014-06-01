@@ -91,6 +91,37 @@ def push_file(path, socket, hash_code=None, buf_size=1024):
 
     _send(socket, hash_code)
 
+def pull_file(path, socket, buf_size=1024):
+    """
+    Given a path to a writable file and a socket, receive YASA transmitted 
+    data over the socket and write it to a new file at `path`. Returns the
+    hash of the file _according to the sender_.
+    """
+    fd = open(path, 'wb')
+
+    buf = ''
+    while '\n' not in buf:
+        buf += self._socket.recv(10).decode('utf-8')
+
+    flen, buf = buf.split('\n', 1)
+    flen = int(flen.strip())
+    totes = len(buf)
+    fd.write(buf)
+
+    while totes < flen:
+        buf = socket.recv(min(1024, flen-totes))
+        totes += len(buf)
+        fd.write(buf)
+
+    totes = 0
+    buf = ''
+    while len(buf) < 16:
+        buf += socket.recv(16-len(buf))
+
+    fd.close()
+
+    return buf
+
 def hash_file(fd, hash_fn=hashlib.md5):
     """
     Takes a file descriptor, returns a hash object of that file's contents.

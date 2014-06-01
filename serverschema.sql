@@ -1,5 +1,5 @@
 CREATE TABLE files (
-  id INTEGER PRIMARY KEY,
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
   path TEXT,
   hash TEXT,
   received INTEGER,
@@ -10,8 +10,8 @@ CREATE TABLE files (
 CREATE TABLE deleted (
   id INTEGER PRIMARY KEY,
   file_id INTEGER,
-  del_time INTEGER,
-  path TEXT );
+  del_time INTEGER
+);
 
 CREATE TABLE settings (
   key TEXT,

@@ -2,6 +2,7 @@
 import socket
 import os
 import sqlite3
+import time
 
 import parse
 import utils
@@ -109,6 +110,54 @@ class YASAServerSession(object):
                         hash_code=record['hash'].decode('hex'))
 
         return None, session
+
+    def push_command(self, command, session):
+        cursor = self._conn.cursor()
+
+        if command['TYPE'] == 'NEW':
+            cursor.execute('INSERT INTO files (received) VALUES (?)', 
+                           time.time())
+            sid = cursor.lastrowid
+            resp = parse.dumps({'ACTION': 'HSUP',
+                                'ID': sid,
+                                'DONE': 0})
+            self._send(resp + '\n')
+            file_path = os.path.join( 
+                utils.read_settings(self._conn, 'storage_dir')['storage_dir'],
+                '%d.mp3' % sid)
+
+            digest = utils.pull_file(file_path, self._socket)
+            our_digest = utils.hash_file(open(file_path, 'rb')).digest()
+
+            if our_digest != digest:
+                cursor.execute('DELETE FROM files WHERE id=?', [sid])
+                resp = {'ACTION': 'ERROR',
+                        'REASON': 'Hash mismatch, record revoked, retransmit'}
+                self._conn.commit()
+                return resp, session
+
+            cursor.execute('UPDATE files SET path=?, hash=? WHERE id=?',
+                           [file_path, digest.encode('hex'), sid])
+            self._conn.commit()
+
+            resp = {'ACTION': 'HSUP',
+                    'DONE': 1}
+            return resp, session
+
+        elif command['TYPE'] == 'DELETE':
+            sid = int(command['ID'])
+            cursor.execute(
+                'INSERT INTO deleted (file_id, del_time) VALUES (?, ?)',
+                [sid, time.time()])
+            cursor.execute('DELETE FROM files WHERE id=?', [sid])
+
+            resp = {'ACTION': 'HSUP',
+                    'DONE': 1}
+            return resp, session
+        else:
+            resp = {'ACTION': 'ERROR',
+                    'REASON': 'Unknown PUSH type: %s' % command['TYPE']}
+            return resp, session
 
     def default_command(self, command, session):
         response = {'ACTION': 'ERROR',
