@@ -169,6 +169,8 @@ def dumps(value):
             pairs.append(u'(%s %s)' % (unicode(key),
                                        escape(dumps(sub_value))))
         s += ' '.join(pairs)
+    else:
+        s = unicode(value)
 
     return s
 
