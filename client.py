@@ -52,7 +52,7 @@ class YASAClientSession(object):
             new_path = subprocess.check_output(["osascript", "-e", 
                                                 command % path])
 
-            return new_path
+            return new_path.strip()
 
         elif sys.platform == 'win32':
             pass
@@ -78,17 +78,17 @@ class YASAClientSession(object):
 
         return response
 
-    def pull_remote(file_id):
+    def pull_remote(self, file_id):
         """
         Grabs a file from the remote host and writes its contents to a 
         temporary file. Returns temp file path and file hash (from remote).
         """
         request = parse.dumps({'ACTION': 'PULL-FILE',
                                'ID': file_id})
-        self._send(request)
-        file_name = os.tmpnam()
+        self._send(request + '\n')
+        file_name = os.tmpnam() + '.mp3'
 
-        digest = utils.pull_file(fime_name, self._socket)
+        digest = utils.pull_file(file_name, self._socket)
         return file_name, digest
 
     def do_pull(self):
@@ -104,9 +104,9 @@ class YASAClientSession(object):
 
         for x in to_recv:
             from_serv = parse.loads(x)
-            sid = int(from_serv['id'])
-            logging.debug('Proccessing new file. SID: %s, type: %s'
-                          % (from_serv['id'], from_serv['type']))
+            sid = int(from_serv['ID'])
+            logging.debug('Proccessing file update. SID: %d, type: %s'
+                          % (sid, from_serv['type']))
             if from_serv['type'] == 'NEW':
                 cursor.execute('SELECT 1 FROM files WHERE server_id=?', [sid])
                 if cursor.fetchone():
@@ -144,7 +144,8 @@ class YASAClientSession(object):
                 self.remove_from_itunes(sid)
                 cursor.execute('DELETE FROM files WHERE server_id=?', [sid])
 
-        self._conn.commit()
+            self._conn.commit()
+
         logging.info('...finished pull process')
 
     def do_push(self):

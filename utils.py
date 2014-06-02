@@ -95,6 +95,7 @@ def push_file(path, socket, hash_code=None, buf_size=1024):
     Given a path to a file and optionally a hash, sends both over the socket
     per the YASA convention. Will generate hash if none is provided.
     """
+    print 'Pushin'
     if not hash_code:
         fd = open(path, 'rb')
         hash_code = hash_file(fd).digest()
@@ -118,6 +119,7 @@ def pull_file(path, socket, buf_size=1024):
     data over the socket and write it to a new file at `path`. Returns the
     hash of the file _according to the sender_.
     """
+    print 'Pullin'
     fd = open(path, 'wb')
 
     buf = ''
@@ -182,7 +184,7 @@ def generate_file_info(path):
     f.close()
     t = int(time.time())
 
-    return {'path': path,
+    return {'path': path.decode('UTF-8'),
             'hash': h.hexdigest(),
             'server_id': None,
             'mtime': int(os.path.getmtime(path)),

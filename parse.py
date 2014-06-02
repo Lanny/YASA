@@ -17,7 +17,7 @@ class ParsedDict(dict):
     """
     def __getitem__(self, key):
         try:
-            return super(ParsedDict, self).__getitem__(key)
+            return super(ParsedDict, self).__getitem__(key.upper())
         except KeyError, e:
             excpt = ParsedKeyError(e.message)
             excpt.missing_key = key
@@ -153,13 +153,13 @@ def dumps(value):
     s = u''
 
     if isinstance(value, basestring):
-        s = unicode(value)
+        s = escape(unicode(value))
 
     elif isinstance(value, list):
         items = ['(LENGTH %d)' % len(value)]
 
         for idx, sub_v in enumerate(value):
-            items.append('(%d %s)' % (idx, dumps(sub_v)))
+            items.append('(%d %s)' % (idx, escape(dumps(sub_v))))
 
         s = ' '.join(items)
 
@@ -170,7 +170,7 @@ def dumps(value):
                                        escape(dumps(sub_value))))
         s += ' '.join(pairs)
     else:
-        s = unicode(value)
+        s = escape(unicode(value))
 
     return s
 

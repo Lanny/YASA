@@ -6,7 +6,7 @@ CREATE TABLE files (
   mtime INTEGER,
   last_internal_update INTEGER,
   last_scan INTEGER,
-  UNIQUE(path));
+  UNIQUE(server_id));
 
 -- Contains records that have been deleted from the library and must be
 -- propogated
