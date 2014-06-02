@@ -9,7 +9,7 @@ import logging
 import parse
 import utils
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
 
 class YASAClientSession(object):
     def __init__(self, s, db_conn=None):
@@ -68,8 +68,13 @@ class YASAClientSession(object):
         the server to send a response and returns the parsed response.
         """
         request = parse.dumps(message)
-        self._send(request)
+
+        logging.debug('GIVE -> %s' % request)
+
+        self._send(request + '\n')
         response = next(self._responses)
+
+        logging.debug('GOT  -> %s' % response)
 
         return response
 
@@ -87,6 +92,7 @@ class YASAClientSession(object):
         return file_name, digest
 
     def do_pull(self):
+        logging.info('Starting pull process')
         since = (utils.read_settings(self._conn, 'last_update')
                       .get('last_update', 0))
         cursor = self._conn.cursor()
@@ -149,7 +155,7 @@ class YASAClientSession(object):
         cursor.execute('SELECT * FROM files WHERE server_id IS NULL')
         add_files = cursor.fetchall()
 
-        cursor.execute('SELECT * FROM deleted WHERE deltime>?', [since])
+        cursor.execute('SELECT * FROM deleted WHERE del_time>?', [since])
         rem_files = cursor.fetchall()
 
         for record in add_files:
@@ -161,6 +167,10 @@ class YASAClientSession(object):
             utils.push_file(record['path'], self._socket, 
                             hash_code=record['hash'].decode('hex'))
 
+            # Read off the server's reply, since this didn't go through the
+            # communicate method we have to do it ourselves.
+            next(self._responses)
+
         for record in rem_files:
             response = self.communicate({'ACTION': 'PUSH',
                                          'TYPE': 'DELETE',
@@ -169,3 +179,9 @@ class YASAClientSession(object):
     def sync(self):
         self.do_pull()
         self.do_push()
+
+if __name__ == '__main__':
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.connect(('localhost', 7454))
+    sess = YASAClientSession(s)
+    sess.sync()

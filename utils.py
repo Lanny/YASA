@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 import os
+import sys
 import time
 import sqlite3
 import hashlib
@@ -41,6 +42,17 @@ def get_client_connection(path):
         cursor.executescript(schema.read())
         schema.close()
 
+        if sys.platform == 'darwin':
+            lib_dir = os.path.join(os.path.expanduser('~'),
+                                   'Music/iTunes/iTunes Media/Music')
+        elif sys.platform == 'win32':
+            # TODO: support windows
+            raise Exception('Unsupported system, aborting.')
+        else:
+            raise Exception('Unsupported system, aborting.')
+
+        write_settings(conn, lib_dir=lib_dir)
+
     return conn
 
 def get_server_connection(path):
@@ -59,12 +71,21 @@ def get_server_connection(path):
         cursor.executescript(schema.read())
         schema.close()
 
+        storage_dir = os.path.join(os.path.expanduser('~'), 'yasastorage')
+        try:
+            os.makedirs(storage_dir)
+        except OSError:
+            pass # Directory probably already exists
+
+        write_settings(conn, storage_dir=storage_dir)
+        conn.commit()
+
     return conn
 
 def _send(socket, msg):
     totes_sent = 0
     while totes_sent < len(msg):
-        sent = socket.send(buf[totes_sent:])
+        sent = socket.send(msg[totes_sent:])
         if sent == 0:
             raise RuntimeError("socket connection broken")
         totes_sent += sent
@@ -80,7 +101,7 @@ def push_file(path, socket, hash_code=None, buf_size=1024):
         fd.close()
 
     fd = open(path, 'rb')
-    fsize = os.fstat(f.fileno()).st_size
+    fsize = os.fstat(fd.fileno()).st_size
     _send(socket, '%d\n' % fsize)
 
     totes = 0
@@ -101,7 +122,7 @@ def pull_file(path, socket, buf_size=1024):
 
     buf = ''
     while '\n' not in buf:
-        buf += self._socket.recv(10).decode('utf-8')
+        buf += socket.recv(10).decode('utf-8')
 
     flen, buf = buf.split('\n', 1)
     flen = int(flen.strip())

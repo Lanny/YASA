@@ -3,9 +3,12 @@ import socket
 import os
 import sqlite3
 import time
+import logging
 
 import parse
 import utils
+
+logging.basicConfig(level=logging.DEBUG)
 
 class YASAServerSession(object):
     def __init__(self, s):
@@ -18,8 +21,11 @@ class YASAServerSession(object):
             'HELO': self.helo_command,
             'PULL': self.pull_command,
             'PULL-FILE': self.pull_file_command,
+            'PUSH': self.push_command,
             'DEFAULT': self.default_command
         }
+
+        logging.info('New session initiated.')
 
     def _send(self, msg):
         totalsent = 0
@@ -33,6 +39,7 @@ class YASAServerSession(object):
         commands = parse.recv_load(self._socket)
 
         for command in commands:
+            logging.debug('GOT  <- %s' % command)
             resp = self._handle_command(command)
 
             if not resp:
@@ -40,6 +47,7 @@ class YASAServerSession(object):
             elif callable(resp): # Hook for generators
                 pass
             else:
+                logging.debug('GIVE -> %s' % resp)
                 self._send(resp + '\n')
 
     def _handle_command(self, command):
@@ -116,11 +124,12 @@ class YASAServerSession(object):
 
         if command['TYPE'] == 'NEW':
             cursor.execute('INSERT INTO files (received) VALUES (?)', 
-                           time.time())
+                           [time.time()])
             sid = cursor.lastrowid
             resp = parse.dumps({'ACTION': 'HSUP',
                                 'ID': sid,
                                 'DONE': 0})
+            logging.debug('CONT -> %s' % resp)
             self._send(resp + '\n')
             file_path = os.path.join( 
                 utils.read_settings(self._conn, 'storage_dir')['storage_dir'],
@@ -167,9 +176,11 @@ class YASAServerSession(object):
 def serve_forever(port=7454):
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    s.bind(('', port))
+    s.bind(('0.0.0.0', port))
     s.listen(1)
 
+    logging.warning('YASA Server running and accepting connections on port %d!'
+                    % port)
     while 1:
         conn, addr = s.accept()
         sess = YASAServerSession(conn)

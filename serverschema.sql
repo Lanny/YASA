@@ -17,3 +17,6 @@ CREATE TABLE settings (
   key TEXT,
   value TEXT, 
   UNIQUE(key) ON CONFLICT REPLACE);
+
+INSERT INTO settings (key, value) 
+  VAlUES ('storage_dir', '/Users/lanny/YASA/storage');

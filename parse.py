@@ -192,7 +192,7 @@ def listify(l):
     Takes a YASA syle list (already parsed into a dictionary) and returns a
     python list.
     """
-    arr = [None] * int(l.get('length', 0))
+    arr = [None] * int(l.get('LENGTH', 0))
     for k, v in l.items():
         if k.upper() == 'LENGTH':
             continue

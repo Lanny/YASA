@@ -82,4 +82,6 @@ def reconcile(path, conn):
 
 if __name__ == '__main__':
     conn = utils.get_client_connection('yasaclient.db')
-    reconcile('testlib_one', conn)
+    lib_dir = utils.read_settings(conn, 'lib_dir').get('lib_dir')
+
+    reconcile(lib_dir, conn)
