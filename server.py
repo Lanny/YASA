@@ -87,11 +87,10 @@ class YASAServerSession(object):
 
     def pull_command(self, command, session):
         cursor = self._conn.cursor()
-        cursor.execute('SELECT * FROM files WHERE received>?', 
-                       [int(command['SINCE'])])
+        since = utils.flint(command['SINCE'])
+        cursor.execute('SELECT * FROM files WHERE received>?', [since])
         new_files = cursor.fetchall()
-        cursor.execute('SELECT * FROM deleted WHERE del_time>?', 
-                       [int(command['SINCE'])])
+        cursor.execute('SELECT * FROM deleted WHERE del_time>?', [since])
         del_files = cursor.fetchall()
 
         l = []

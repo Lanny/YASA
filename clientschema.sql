@@ -12,6 +12,7 @@ CREATE TABLE files (
 -- propogated
 CREATE TABLE deleted (
   id INTEGER PRIMARY KEY,
+  server_id INTEGER,
   del_time INTEGER,
   path TEXT );
 

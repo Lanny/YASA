@@ -7,6 +7,9 @@ import hashlib
 import socket
 import urllib
 import uuid
+import logging
+
+logging.basicConfig(level=logging.DEBUG)
 
 def dict_factory(cursor, row):
     d = {}
@@ -95,7 +98,7 @@ def push_file(path, socket, hash_code=None, buf_size=1024):
     Given a path to a file and optionally a hash, sends both over the socket
     per the YASA convention. Will generate hash if none is provided.
     """
-    print 'Pushin'
+    logging.debug('GIVE FILE -> %s' % path)
     if not hash_code:
         fd = open(path, 'rb')
         hash_code = hash_file(fd).digest()
@@ -119,7 +122,7 @@ def pull_file(path, socket, buf_size=1024):
     data over the socket and write it to a new file at `path`. Returns the
     hash of the file _according to the sender_.
     """
-    print 'Pullin'
+    logging.debug('GOT FILE  <- %s' % path)
     fd = open(path, 'wb')
 
     buf = ''
@@ -241,3 +244,10 @@ def get_or_guess_node_ref(conn):
         write_settings(conn, **rv)
 
     return rv['my-uuid'], rv['my-addr'], rv['my-vol']
+
+def flint(x):
+    """
+    lol
+    """
+    return int(float(x))
+

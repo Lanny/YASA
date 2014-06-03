@@ -74,7 +74,7 @@ class YASAClientSession(object):
         self._send(request + '\n')
         response = next(self._responses)
 
-        logging.debug('GOT  -> %s' % response)
+        logging.debug('GOT  <- %s' % response)
 
         return response
 
@@ -149,6 +149,8 @@ class YASAClientSession(object):
         logging.info('...finished pull process')
 
     def do_push(self):
+        logging.info('Starting push process')
+
         cursor = self._conn.cursor()
         since = (utils.read_settings(self._conn, 'last_update')
                       .get('last_update', 0))
@@ -158,6 +160,9 @@ class YASAClientSession(object):
 
         cursor.execute('SELECT * FROM deleted WHERE del_time>?', [since])
         rem_files = cursor.fetchall()
+
+        logging.info('Notifying server %d new files and %d old ones' %
+                     (len(add_files), len(rem_files)))
 
         for record in add_files:
             response = self.communicate({'ACTION': 'PUSH',
@@ -175,7 +180,9 @@ class YASAClientSession(object):
         for record in rem_files:
             response = self.communicate({'ACTION': 'PUSH',
                                          'TYPE': 'DELETE',
-                                         'SID': record['server_id']})
+                                         'ID': record['server_id']})
+
+        logging.info('...finished push process')
 
     def sync(self):
         self.do_pull()

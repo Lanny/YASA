@@ -73,8 +73,9 @@ def reconcile(path, conn):
 
     for record in removed:
         logging.info("Recording as gone: %s" % path)
-        cursor.execute('INSERT INTO deleted (del_time, path) VALUES (?, ?)',
-                       [time.time(), record['path']])
+        cursor.execute(('INSERT INTO deleted (del_time, server_id, path) '
+                        'VALUES (?, ?, ?)'),
+                       [time.time(), record['server_id'], record['path']])
         cursor.execute('DELETE FROM files WHERE id=?', [record['id']])
 
     conn.commit()
