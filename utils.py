@@ -184,7 +184,11 @@ def generate_file_info(path):
     f.close()
     t = int(time.time())
 
-    return {'path': path.decode('UTF-8'),
+    # This is bad, we should do this at system boundries. It's on the todo
+    if not isinstance(path, unicode):
+        path = path.decode('UTF-8')
+
+    return {'path': path,
             'hash': h.hexdigest(),
             'server_id': None,
             'mtime': int(os.path.getmtime(path)),

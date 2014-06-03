@@ -180,6 +180,7 @@ class YASAClientSession(object):
     def sync(self):
         self.do_pull()
         self.do_push()
+        utils.write_settings(self._conn, last_update=time.time())
 
 if __name__ == '__main__':
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
